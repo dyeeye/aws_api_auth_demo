@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+	<flow name="aws_ssm_parameters_demoFlow" doc:id="a4eb31de-82e5-40fe-805f-32471ea07fcd" >
+		<scheduler doc:name="Scheduler" doc:id="6da8972e-2e0e-4ed5-9360-1def53bd5b13" >
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+		</scheduler>
+		<ee:transform doc:name="Request" doc:id="3535deca-ed7d-4a3a-990b-8baadcc65f77" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "Name": "/dev/s-mongodb/password",
+    "WithDecryption": true
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="AWS Headers" doc:id="a08d1fd5-ad04-4c76-8c63-7b1a47eced8c">
+			<ee:message>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="headers" ><![CDATA[%dw 2.0
+output application/json
+
+import generateSecureAWSHeaders from dw::com::ambassadorpatryk::aws::Auth
+---
+generateSecureAWSHeaders(
+	'POST', 
+	'us-east-1', 
+	'ssm',
+	'AmazonSSM.GetParameter', 
+	'/', 
+	'', 
+	payload, 
+	Mule::p('secure::aws.accessKey'), 
+	Mule::p('secure::aws.secretKey'))
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="917ab1c7-3917-492d-a5f4-4193066669af" config-ref="AWS_HTTP_Request_configuration" path="/">
+			<http:body ><![CDATA[#[output application/json
+---
+{
+    "Name": "/dev/s-mongodb/password",
+    "WithDecryption": true
+}]]]></http:body>
+			<http:headers ><![CDATA[#[output application/java
+---
+vars.headers]]]></http:headers>
+			<http:response-validator >
+				<http:success-status-code-validator values="200..599" />
+			</http:response-validator>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="6245aae6-a984-46d8-8710-71f530885c65" message="#[payload]"/>
+	</flow>
+</mule>
